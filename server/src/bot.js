@@ -3,7 +3,10 @@ import "dotenv/config";
 import { upsertUser, addStars } from "./db.js";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const PUBLIC_URL = process.env.PUBLIC_URL;
+const PUBLIC_URL = process.env.PUBLIC_URL; // адрес БЭКЕНДА (Render) — для вебхука
+// адрес ФРОНТЕНДА (Vercel) — то, что реально открывается как Mini App.
+// Если не задан отдельно, используем PUBLIC_URL (актуально при деплое всё-в-одном).
+const WEBAPP_URL = (process.env.WEBAPP_URL || PUBLIC_URL || "").trim().replace(/\/+$/, "");
 const WEBAPP_SHORT_NAME = process.env.WEBAPP_SHORT_NAME || "wishlist";
 
 if (!BOT_TOKEN) {
@@ -49,8 +52,8 @@ bot.command("start", async (ctx) => {
 
   const startParam = ctx.match; // deep-link параметр после /start
   const webAppUrl = startParam
-    ? `${PUBLIC_URL}/?tgWebAppStartParam=${encodeURIComponent(startParam)}`
-    : PUBLIC_URL;
+    ? `${WEBAPP_URL}/?tgWebAppStartParam=${encodeURIComponent(startParam)}`
+    : WEBAPP_URL;
 
   const kb = new InlineKeyboard().webApp("🎁 Открыть вишлист", webAppUrl);
 
@@ -63,7 +66,7 @@ bot.command("start", async (ctx) => {
   try {
     await ctx.api.setChatMenuButton({
       chat_id: ctx.from.id,
-      menu_button: { type: "web_app", text: "Вишлист", web_app: { url: PUBLIC_URL } },
+      menu_button: { type: "web_app", text: "Вишлист", web_app: { url: WEBAPP_URL } },
     });
   } catch {
     // игнорируем, если не удалось (например, недостаточно прав)
