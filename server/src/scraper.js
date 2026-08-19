@@ -38,6 +38,79 @@ function detectCurrency(text) {
 }
 
 export async function scrapeProduct(url) {
+  const hostname = new URL(url).hostname.replace(/^www\./, "");
+
+  if (hostname.includes("wildberries.")) {
+    try {
+      const wbData = await scrapeWildberries(url);
+      if (wbData) return wbData;
+    } catch (e) {
+      console.error("[scrapeWildberries] неофициальный способ не сработал, откат на обычный:", e.message);
+    }
+  }
+
+  return scrapeGeneric(url);
+}
+
+// --- Wildberries: неофициальный служебный JSON-адрес карточки товара ---
+// ВАЖНО: это не публичный документированный API, а внутренний адрес, которым
+// пользуется сам сайт WB для подгрузки данных. Он может измениться без
+// предупреждения — тогда просто произойдёт откат на обычный способ (scrapeGeneric),
+// а если и он не сработает — на ручное заполнение. Ничего не сломается насовсем.
+async function scrapeWildberries(url) {
+  const match = url.match(/catalog\/(\d+)/);
+  if (!match) return null;
+  const nmId = match[1];
+
+  const apiUrl = `https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm=${nmId}`;
+  const res = await fetch(apiUrl, { headers: BROWSER_HEADERS, timeout: 10000 });
+  if (!res.ok) throw new Error(`card.wb.ru ответил ${res.status}`);
+
+  const json = await res.json();
+  const product = json?.data?.products?.[0] || json?.products?.[0];
+  if (!product) throw new Error("товар не найден в ответе card.wb.ru");
+
+  const title = [product.brand, product.name].filter(Boolean).join(" — ") || null;
+
+  // Цена у WB приходит в сотых долях копейки (price * 100 * 100); при смене
+  // формата на «уже в рублях» подстрахуемся эвристикой на разумность величины.
+  const rawPrice = product.salePriceU ?? product.priceU ?? null;
+  let price = null;
+  if (typeof rawPrice === "number" && rawPrice > 0) {
+    price = rawPrice / 100;
+    if (price > 2_000_000) price = price / 100; // на случай другого масштаба
+  }
+
+  const image_url = buildWbImageUrl(Number(nmId));
+
+  return {
+    title,
+    image_url,
+    price,
+    currency: "RUB",
+    site_name: "wildberries.ru",
+  };
+}
+
+// Картинки WB раздаются с "корзин" (basket-XX.wbbasket.ru), номер которой
+// зависит от диапазона, в который попадает id товара. Таблица диапазонов
+// периодически расширяется самим WB — если попадём мимо, картинка просто не
+// загрузится, и на карточке останется placeholder-иконка подарка.
+function buildWbImageUrl(nmId) {
+  const vol = Math.floor(nmId / 100000);
+  const part = Math.floor(nmId / 1000);
+  const ranges = [
+    [143, "01"], [287, "02"], [431, "03"], [719, "04"], [1007, "05"],
+    [1061, "06"], [1115, "07"], [1169, "08"], [1313, "09"], [1601, "10"],
+    [1655, "11"], [1919, "12"], [2045, "13"], [2189, "14"], [2405, "15"],
+    [2621, "16"], [2837, "17"], [3053, "18"], [3269, "19"], [3485, "20"],
+    [3701, "21"], [3917, "22"], [4133, "23"],
+  ];
+  const basket = ranges.find(([max]) => vol <= max)?.[1] || "24";
+  return `https://basket-${basket}.wbbasket.ru/vol${vol}/part${part}/${nmId}/images/big/1.webp`;
+}
+
+async function scrapeGeneric(url) {
   const res = await fetch(url, {
     headers: BROWSER_HEADERS,
     redirect: "follow",

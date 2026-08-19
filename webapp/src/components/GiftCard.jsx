@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { openExternalLink, hapticImpact } from "../telegram.js";
 
 function formatPrice(price, currency) {
@@ -8,6 +9,7 @@ function formatPrice(price, currency) {
 
 export default function GiftCard({ item, isOwner, onBookToggle, onEdit, onDelete }) {
   const price = formatPrice(item.price, item.currency);
+  const [imgFailed, setImgFailed] = useState(false);
 
   function openProduct() {
     hapticImpact("light");
@@ -17,8 +19,8 @@ export default function GiftCard({ item, isOwner, onBookToggle, onEdit, onDelete
   return (
     <div className="gift-card">
       <button className="gift-image-wrap" onClick={openProduct} aria-label={`Открыть товар: ${item.title}`}>
-        {item.image_url ? (
-          <img src={item.image_url} alt={item.title} loading="lazy" />
+        {item.image_url && !imgFailed ? (
+          <img src={item.image_url} alt={item.title} loading="lazy" onError={() => setImgFailed(true)} />
         ) : (
           <span className="gift-image-placeholder">🎁</span>
         )}
