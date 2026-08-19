@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { webhookCallback } from "grammy";
@@ -15,9 +16,10 @@ const app = express();
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const PORT = process.env.PORT || 3000;
-const USE_WEBHOOK = process.env.USE_WEBHOOK === "true";
+// .trim().toLowerCase() — на случай лишнего пробела/переноса строки при вставке в панели хостинга
+const USE_WEBHOOK = (process.env.USE_WEBHOOK || "").trim().toLowerCase() === "true";
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "webhook";
-const PUBLIC_URL = process.env.PUBLIC_URL;
+const PUBLIC_URL = (process.env.PUBLIC_URL || "").trim().replace(/\/+$/, "");
 
 // Если фронтенд задеплоен на отдельном домене (например Vercel), укажите его
 // в ALLOWED_ORIGIN, чтобы ограничить CORS только им. Если не задано — разрешены все.
@@ -37,12 +39,22 @@ api.use(profileRoutes);
 api.use(wishlistRoutes);
 app.use("/api", api);
 
-// --- Статика собранного Mini App (webapp/dist) ---
+// --- Статика собранного Mini App (webapp/dist), если она есть рядом ---
+// Если фронтенд задеплоен отдельно (например на Vercel), эта папка отсутствует —
+// тогда сервер просто отвечает коротким сообщением на "/", это нормально.
 const webappDist = path.join(__dirname, "../../webapp/dist");
-app.use(express.static(webappDist));
-app.get("*", (req, res) => {
-  res.sendFile(path.join(webappDist, "index.html"));
-});
+const hasWebappDist = fs.existsSync(path.join(webappDist, "index.html"));
+
+if (hasWebappDist) {
+  app.use(express.static(webappDist));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(webappDist, "index.html"));
+  });
+} else {
+  app.get("/", (req, res) => {
+    res.json({ ok: true, service: "wishlist-server" });
+  });
+}
 
 app.listen(PORT, async () => {
   console.log(`Server listening on :${PORT}`);
