@@ -32,7 +32,7 @@ export default function GiftCard({ item, isOwner, onBookToggle, onEdit, onDelete
 
       <div className="gift-body">
         <div className="gift-title" onClick={openProduct} role="button">
-          {item.title}
+          {item.title || "Название не указано — нажмите ✎, чтобы заполнить"}
         </div>
         <div className="gift-site">{item.site_name}</div>
         {price && <div className="gift-price">{price}</div>}

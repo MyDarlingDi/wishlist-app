@@ -75,12 +75,27 @@ router.post("/wishlist/items", async (req, res) => {
   if (!url || !/^https?:\/\//i.test(url)) {
     return res.status(400).json({ error: "invalid_url" });
   }
+
+  let data;
   try {
-    const data = await scrapeProduct(url);
-    const item = await insertItem(ownerId, { url, ...data });
-    res.json(item);
+    data = await scrapeProduct(url);
   } catch (e) {
-    res.status(422).json({ error: "scrape_failed", message: e.message });
+    // Не рушим сценарий: сайт мог заблокировать сервер (частое дело у WB/Ozon) —
+    // добавляем подарок с пустыми полями, владелец дозаполнит вручную.
+    console.error("[scrapeProduct] не удалось распознать", url, "-", e.message);
+    let hostname = "";
+    try {
+      hostname = new URL(url).hostname.replace(/^www\./, "");
+    } catch {}
+    data = { title: null, image_url: null, price: null, currency: "RUB", site_name: hostname };
+  }
+
+  try {
+    const item = await insertItem(ownerId, { url, ...data });
+    res.json({ ...item, needs_manual_edit: !data.title });
+  } catch (e) {
+    console.error("[insertItem] ошибка записи в БД:", e.message);
+    res.status(500).json({ error: "save_failed", message: e.message });
   }
 });
 

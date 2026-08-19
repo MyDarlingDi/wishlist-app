@@ -16,13 +16,11 @@ export default function AddGiftModal({ onClose, onAdded }) {
       const item = await api.addItem(url.trim());
       setPreview(item);
       onAdded(item);
-      setTimeout(onClose, 700);
+      if (!item.needs_manual_edit) {
+        setTimeout(onClose, 700);
+      }
     } catch (err) {
-      setError(
-        err.body?.error === "scrape_failed"
-          ? "Не получилось распознать товар по ссылке. Проверьте, что ссылка ведёт прямо на страницу товара."
-          : "Что-то пошло не так, попробуйте ещё раз."
-      );
+      setError("Не получилось сохранить подарок, попробуйте ещё раз.");
     } finally {
       setLoading(false);
     }
@@ -49,14 +47,28 @@ export default function AddGiftModal({ onClose, onAdded }) {
             <div className="preview-card">
               {preview.image_url && <img src={preview.image_url} alt="" />}
               <div>
-                <div style={{ fontWeight: 700, fontSize: 13.5 }}>{preview.title}</div>
-                <div className="hint-text">Добавлено ✓</div>
+                <div style={{ fontWeight: 700, fontSize: 13.5 }}>
+                  {preview.title || "Название не распозналось"}
+                </div>
+                {preview.needs_manual_edit ? (
+                  <div className="hint-text">
+                    Сайт не отдал данные о товаре (так бывает с Wildberries/Ozon). Подарок добавлен —
+                    поправьте название, фото и цену вручную через значок ✎ на карточке.
+                  </div>
+                ) : (
+                  <div className="hint-text">Добавлено ✓</div>
+                )}
               </div>
             </div>
           )}
           <button className="btn btn-ribbon btn-block" disabled={loading || !url.trim()}>
             {loading ? "Ищем товар…" : "Добавить в вишлист"}
           </button>
+          {preview && (
+            <button type="button" className="btn btn-ghost btn-block" onClick={onClose}>
+              Готово
+            </button>
+          )}
         </form>
       </div>
     </div>

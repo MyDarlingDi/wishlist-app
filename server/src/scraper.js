@@ -3,6 +3,13 @@ import fetch from "node-fetch";
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+const BROWSER_HEADERS = {
+  "User-Agent": UA,
+  "Accept-Language": "ru,en;q=0.8",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Upgrade-Insecure-Requests": "1",
+};
 
 // Частые способы, которыми магазины прячут цену в meta/JSON-LD
 const PRICE_META_KEYS = [
@@ -32,7 +39,7 @@ function detectCurrency(text) {
 
 export async function scrapeProduct(url) {
   const res = await fetch(url, {
-    headers: { "User-Agent": UA, "Accept-Language": "ru,en;q=0.8" },
+    headers: BROWSER_HEADERS,
     redirect: "follow",
     timeout: 15000,
   });
@@ -46,7 +53,7 @@ export async function scrapeProduct(url) {
     $('meta[property="og:title"]').attr("content") ||
     $('meta[name="twitter:title"]').attr("content") ||
     $("title").first().text() ||
-    "Товар";
+    null;
 
   let image =
     $('meta[property="og:image"]').attr("content") ||
@@ -83,7 +90,7 @@ export async function scrapeProduct(url) {
   if (!currency) currency = "RUB";
 
   return {
-    title: title.trim().slice(0, 300),
+    title: title ? title.trim().slice(0, 300) : null,
     image_url: image,
     price,
     currency,
