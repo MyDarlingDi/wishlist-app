@@ -38,7 +38,7 @@ const router = Router();
 // Профиль текущего пользователя (для владельца — включая звёзды)
 router.get("/me", async (req, res) => {
   const tgUser = req.tgUser;
-  let user = getUser(tgUser.id);
+  let user = await getUser(tgUser.id);
   if (!user) {
     // первый заход в Mini App без предварительного /start — синхронизируем на лету
     user = await refreshFromTelegram(tgUser.id, tgUser);
@@ -58,7 +58,7 @@ router.get("/me", async (req, res) => {
 // Публичный профиль владельца вишлиста (без звёзд)
 router.get("/users/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const user = getUser(id);
+  const user = await getUser(id);
   if (!user) return res.status(404).json({ error: "not_found" });
   res.json({
     id: user.tg_id,

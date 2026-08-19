@@ -1,5 +1,16 @@
 import { Router } from "express";
-import { db, getUser } from "../db.js";
+import {
+  getUser,
+  listItems,
+  listBookingsByOwner,
+  insertItem,
+  getItem,
+  updateItem,
+  deleteItem,
+  getBooking,
+  insertBooking,
+  deleteBooking,
+} from "../db.js";
 import { scrapeProduct } from "../scraper.js";
 import { createStarsInvoiceLink } from "../bot.js";
 
@@ -12,16 +23,16 @@ function fullName(u) {
 // Список подарков в вишлисте пользователя :ownerId
 // Если смотрит владелец — бронирования скрыты полностью.
 // Если смотрит гость — видно, занято ли, и забронировал ли он сам.
-router.get("/wishlist/:ownerId", (req, res) => {
+router.get("/wishlist/:ownerId", async (req, res) => {
   const ownerId = Number(req.params.ownerId);
   const viewerId = req.tgUser.id;
   const isOwner = ownerId === viewerId;
 
-  const owner = getUser(ownerId);
+  const owner = await getUser(ownerId);
   if (!owner) return res.status(404).json({ error: "not_found" });
 
-  const items = db.prepare("SELECT * FROM items WHERE owner_id = ? ORDER BY position, id").all(ownerId);
-  const bookings = db.prepare("SELECT * FROM bookings WHERE item_id IN (SELECT id FROM items WHERE owner_id = ?)").all(ownerId);
+  const items = await listItems(ownerId);
+  const bookings = isOwner ? [] : await listBookingsByOwner(ownerId);
   const bookingByItem = new Map(bookings.map((b) => [b.item_id, b]));
 
   const result = items.map((it) => {
@@ -66,13 +77,7 @@ router.post("/wishlist/items", async (req, res) => {
   }
   try {
     const data = await scrapeProduct(url);
-    const info = db
-      .prepare(
-        `INSERT INTO items (owner_id, url, title, image_url, price, currency, site_name)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(ownerId, url, data.title, data.image_url, data.price, data.currency, data.site_name);
-    const item = db.prepare("SELECT * FROM items WHERE id = ?").get(info.lastInsertRowid);
+    const item = await insertItem(ownerId, { url, ...data });
     res.json(item);
   } catch (e) {
     res.status(422).json({ error: "scrape_failed", message: e.message });
@@ -80,61 +85,53 @@ router.post("/wishlist/items", async (req, res) => {
 });
 
 // Ручное редактирование карточки (если распознавание неточное)
-router.patch("/wishlist/items/:id", (req, res) => {
+router.patch("/wishlist/items/:id", async (req, res) => {
   const ownerId = req.tgUser.id;
   const id = Number(req.params.id);
-  const item = db.prepare("SELECT * FROM items WHERE id = ?").get(id);
+  const item = await getItem(id);
   if (!item || item.owner_id !== ownerId) return res.status(404).json({ error: "not_found" });
 
-  const { title, price, currency, image_url } = req.body || {};
-  db.prepare(
-    "UPDATE items SET title = COALESCE(?, title), price = COALESCE(?, price), currency = COALESCE(?, currency), image_url = COALESCE(?, image_url) WHERE id = ?"
-  ).run(title, price, currency, image_url, id);
-  res.json(db.prepare("SELECT * FROM items WHERE id = ?").get(id));
+  const updated = await updateItem(id, req.body || {});
+  res.json(updated);
 });
 
-router.delete("/wishlist/items/:id", (req, res) => {
+router.delete("/wishlist/items/:id", async (req, res) => {
   const ownerId = req.tgUser.id;
   const id = Number(req.params.id);
-  const item = db.prepare("SELECT * FROM items WHERE id = ?").get(id);
+  const item = await getItem(id);
   if (!item || item.owner_id !== ownerId) return res.status(404).json({ error: "not_found" });
-  db.prepare("DELETE FROM bookings WHERE item_id = ?").run(id);
-  db.prepare("DELETE FROM items WHERE id = ?").run(id);
+  await deleteItem(id);
   res.json({ ok: true });
 });
 
 // Забронировать подарок (гость; владелец не может бронировать свой же подарок)
-router.post("/wishlist/items/:id/book", (req, res) => {
+router.post("/wishlist/items/:id/book", async (req, res) => {
   const viewerId = req.tgUser.id;
   const id = Number(req.params.id);
-  const item = db.prepare("SELECT * FROM items WHERE id = ?").get(id);
+  const item = await getItem(id);
   if (!item) return res.status(404).json({ error: "not_found" });
   if (item.owner_id === viewerId) return res.status(403).json({ error: "cant_book_own_item" });
 
-  const existing = db.prepare("SELECT * FROM bookings WHERE item_id = ?").get(id);
+  const existing = await getBooking(id);
   if (existing) {
     if (existing.booker_id !== viewerId) return res.status(409).json({ error: "already_booked" });
     return res.json({ booked: true, booked_by_me: true });
   }
 
-  const viewer = getUser(viewerId);
-  db.prepare("INSERT INTO bookings (item_id, booker_id, booker_name) VALUES (?, ?, ?)").run(
-    id,
-    viewerId,
-    viewer ? fullName(viewer) : "Гость"
-  );
+  const viewer = await getUser(viewerId);
+  await insertBooking(id, viewerId, viewer ? fullName(viewer) : "Гость");
   res.json({ booked: true, booked_by_me: true });
 });
 
 // Отменить свою бронь
-router.post("/wishlist/items/:id/unbook", (req, res) => {
+router.post("/wishlist/items/:id/unbook", async (req, res) => {
   const viewerId = req.tgUser.id;
   const id = Number(req.params.id);
-  const existing = db.prepare("SELECT * FROM bookings WHERE item_id = ?").get(id);
+  const existing = await getBooking(id);
   if (!existing || existing.booker_id !== viewerId) {
     return res.status(403).json({ error: "not_your_booking" });
   }
-  db.prepare("DELETE FROM bookings WHERE item_id = ?").run(id);
+  await deleteBooking(id);
   res.json({ booked: false, booked_by_me: false });
 });
 
@@ -148,7 +145,7 @@ router.post("/wishlist/:ownerId/gift-stars", async (req, res) => {
   }
   if (ownerId === viewerId) return res.status(403).json({ error: "cant_gift_self" });
 
-  const viewer = getUser(viewerId);
+  const viewer = await getUser(viewerId);
   const link = await createStarsInvoiceLink({
     ownerId,
     amount,

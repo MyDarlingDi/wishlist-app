@@ -33,7 +33,7 @@ async function syncProfileFromTelegram(ctx, tgId) {
     // недостаточно прав / пользователь скрыл данные — это нормально, просто пропускаем
   }
 
-  return upsertUser({
+  return await upsertUser({
     tg_id: tgId,
     first_name: ctx.from.first_name || "",
     last_name: ctx.from.last_name || "",
@@ -97,7 +97,7 @@ bot.on("message:successful_payment", async (ctx) => {
   }
   if (!payload.ownerId) return;
 
-  addStars(payload.ownerId, payment.total_amount);
+  await addStars(payload.ownerId, payment.total_amount);
 
   try {
     await ctx.api.sendMessage(
