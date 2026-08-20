@@ -30,7 +30,9 @@ export const api = {
   me: () => request("/me"),
   publicUser: (id) => request(`/users/${id}`),
   wishlist: (ownerId) => request(`/wishlist/${ownerId}`),
-  addItem: (url) => request("/wishlist/items", { method: "POST", body: JSON.stringify({ url }) }),
+  addItem: (payload) => request("/wishlist/items", { method: "POST", body: JSON.stringify(payload) }),
+  scrapePreview: (url) =>
+    request("/wishlist/scrape-preview", { method: "POST", body: JSON.stringify({ url }) }),
   updateItem: (id, patch) =>
     request(`/wishlist/items/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteItem: (id) => request(`/wishlist/items/${id}`, { method: "DELETE" }),

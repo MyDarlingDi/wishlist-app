@@ -25,7 +25,8 @@ const PUBLIC_URL = (process.env.PUBLIC_URL || "").trim().replace(/\/+$/, "");
 // в ALLOWED_ORIGIN, чтобы ограничить CORS только им. Если не задано — разрешены все.
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN;
 app.use(cors(ALLOWED_ORIGIN ? { origin: ALLOWED_ORIGIN } : {}));
-app.use(express.json());
+// Увеличенный лимит — сюда попадают сжатые скриншоты товаров (base64)
+app.use(express.json({ limit: "4mb" }));
 
 // --- Вебхук бота (должен стоять ДО express.json() конфликтов нет, grammy сам парсит raw) ---
 if (USE_WEBHOOK) {

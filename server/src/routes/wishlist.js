@@ -68,31 +68,54 @@ router.get("/wishlist/:ownerId", async (req, res) => {
   });
 });
 
-// Добавить подарок по ссылке (только владелец)
-router.post("/wishlist/items", async (req, res) => {
-  const ownerId = req.tgUser.id;
+// Попытка автоматически распознать товар по ссылке — НЕ сохраняет, только
+// возвращает то, что удалось найти, чтобы предзаполнить форму на клиенте.
+router.post("/wishlist/scrape-preview", async (req, res) => {
   const { url } = req.body || {};
   if (!url || !/^https?:\/\//i.test(url)) {
     return res.status(400).json({ error: "invalid_url" });
   }
-
-  let data;
   try {
-    data = await scrapeProduct(url);
+    const data = await scrapeProduct(url);
+    res.json(data);
   } catch (e) {
-    // Не рушим сценарий: сайт мог заблокировать сервер (частое дело у WB/Ozon) —
-    // добавляем подарок с пустыми полями, владелец дозаполнит вручную.
-    console.error("[scrapeProduct] не удалось распознать", url, "-", e.message);
-    let hostname = "";
+    console.error("[scrape-preview] не удалось распознать", url, "-", e.message);
+    res.json({ title: null, image_url: null, price: null, currency: "RUB", site_name: null });
+  }
+});
+
+// Добавить подарок: название/цену/картинку теперь передаёт клиент явно —
+// он мог получить их либо через автораспознавание (scrape-preview), либо
+// вписать вручную, либо приложить свой скриншот (image_url = data: URI).
+router.post("/wishlist/items", async (req, res) => {
+  const ownerId = req.tgUser.id;
+  const { url, title, price, currency, image_url, site_name } = req.body || {};
+  if (!url || !/^https?:\/\//i.test(url)) {
+    return res.status(400).json({ error: "invalid_url" });
+  }
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: "title_required" });
+  }
+
+  let finalSiteName = site_name;
+  if (!finalSiteName) {
     try {
-      hostname = new URL(url).hostname.replace(/^www\./, "");
-    } catch {}
-    data = { title: null, image_url: null, price: null, currency: "RUB", site_name: hostname };
+      finalSiteName = new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      finalSiteName = null;
+    }
   }
 
   try {
-    const item = await insertItem(ownerId, { url, ...data });
-    res.json({ ...item, needs_manual_edit: !data.title });
+    const item = await insertItem(ownerId, {
+      url,
+      title: title.trim().slice(0, 300),
+      price: price ? Number(price) : null,
+      currency: currency || "RUB",
+      image_url: image_url || null,
+      site_name: finalSiteName,
+    });
+    res.json(item);
   } catch (e) {
     console.error("[insertItem] ошибка записи в БД:", e.message);
     res.status(500).json({ error: "save_failed", message: e.message });
