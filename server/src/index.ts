@@ -13,8 +13,13 @@ const { db } = await connectDb(cfg.DATABASE_URL);
 
 const bot = createBot(cfg, db);
 const notifier = createNotifier((chatId, text) => bot.api.sendMessage(chatId, text));
-const vision = createVision(cfg.ANTHROPIC_API_KEY, cfg.VISION_MODEL);
-if (!vision) console.warn("ANTHROPIC_API_KEY is not set: screenshot recognition is disabled");
+const vision = createVision({
+  provider: cfg.VISION_PROVIDER,
+  anthropicKey: cfg.ANTHROPIC_API_KEY,
+  openaiKey: cfg.OPENAI_API_KEY,
+  model: cfg.VISION_MODEL,
+});
+if (!vision) console.warn("No ANTHROPIC_API_KEY / OPENAI_API_KEY: screenshot recognition is disabled");
 
 const app = createApp({
   cfg,

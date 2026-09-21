@@ -74,7 +74,7 @@ wishlist-bot/
 | PATCH / DELETE | `/api/wishes/:id` | Только владелец (чужой id → 404) |
 | POST / DELETE | `/api/wishes/:id/book` | Забронировать / снять бронь (409 `already_booked`) |
 | POST / DELETE | `/api/wishes/:id/contribute` | Внести `{amount}` / забрать свой взнос. Сумма не может превысить остаток (проверка под блокировкой строки) |
-| POST | `/api/parse/screenshot` | `{image: dataURL}` → название, цена, фото товара, вырезанное из скриншота (Claude vision) |
+| POST | `/api/parse/screenshot` | `{image: dataURL}` → название, цена, фото товара, вырезанное из скриншота (Claude или OpenAI vision) |
 | POST | `/api/parse/link` | `{url}` → название, цена, фото по OpenGraph / JSON-LD |
 | POST | `/api/images` | Загрузка своего фото |
 | GET | `/api/images/:id` | Фото (публично, id — случайный uuid) |
@@ -109,7 +109,7 @@ New → **Blueprint** → выберите репозиторий (`render.yaml`
 | `BOT_TOKEN` | новый токен из шага 1 |
 | `DATABASE_URL` | строка из шага 2 |
 | `WEBAPP_URL` | адрес Mini App на Vercel, например `https://wishlist-app-opal.vercel.app` |
-| `ANTHROPIC_API_KEY` | ключ из console.anthropic.com (нужен для распознавания скриншотов; ≈ 1–2 цента за скриншот) |
+| `ANTHROPIC_API_KEY` или `OPENAI_API_KEY` | ключ для распознавания скриншотов (хватит любого одного). Anthropic: console.anthropic.com, ≈ 1–2 цента за скриншот; OpenAI: platform.openai.com, модель `gpt-5.6-luna`, дешевле. Другую модель можно задать через `VISION_MODEL` |
 | `WEBHOOK_SECRET` | генерируется автоматически |
 
 После деплоя `https://<имя>.onrender.com/health` должен ответить `{"ok":true}`.

@@ -14,8 +14,12 @@ const schema = z.object({
   DATABASE_URL: z.string().optional(),
   /** Optional override. Default: derived from BOT_TOKEN (see webhookSecret()). */
   WEBHOOK_SECRET: z.string().min(16).regex(/^[A-Za-z0-9_-]+$/).optional(),
+  /** Screenshot recognition: either key works; if both are set, Anthropic is used unless VISION_PROVIDER says otherwise. */
   ANTHROPIC_API_KEY: z.string().optional(),
-  VISION_MODEL: z.string().default("claude-opus-5"),
+  OPENAI_API_KEY: z.string().optional(),
+  VISION_PROVIDER: z.enum(["anthropic", "openai"]).optional(),
+  /** Overrides the default model of the chosen provider. */
+  VISION_MODEL: z.string().optional(),
   /** initData older than this is rejected. */
   INITDATA_MAX_AGE_SEC: z.coerce.number().default(24 * 3600),
   /**
