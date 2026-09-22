@@ -11,6 +11,10 @@ interface TgWebApp {
   showAlert(msg: string, cb?: () => void): void;
   showConfirm(msg: string, cb: (ok: boolean) => void): void;
   HapticFeedback?: { impactOccurred(style: string): void; notificationOccurred(type: string): void };
+  /** Bot API 7.7+; a no-op on older clients. Without this, a vertical drag anywhere in the app
+   *  (e.g. panning a photo in the crop tool) can be read as "swipe down to close" and exit the
+   *  Mini App entirely — not a crash, just Telegram's own gesture winning the tug-of-war. */
+  disableVerticalSwipes?(): void;
 }
 
 const tg: TgWebApp | undefined = (window as unknown as { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
@@ -18,6 +22,7 @@ const tg: TgWebApp | undefined = (window as unknown as { Telegram?: { WebApp?: T
 export function initTelegram() {
   tg?.ready();
   tg?.expand();
+  tg?.disableVerticalSwipes?.();
   applyTheme();
   tg?.onEvent("themeChanged", applyTheme);
 }

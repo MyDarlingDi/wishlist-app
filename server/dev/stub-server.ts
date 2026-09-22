@@ -53,4 +53,5 @@ const app = createApp({
     },
   },
 });
-app.listen(3000, () => console.log("stub API on :3000  (users: 1 = owner Оля with data, 2 = guest Аня, ?devuser=N for others)"));
+const port = Number(process.env.PORT) || 3000;
+app.listen(port, () => console.log(`stub API on :${port}  (users: 1 = owner Оля with data, 2 = guest Аня, ?devuser=N for others)`));
