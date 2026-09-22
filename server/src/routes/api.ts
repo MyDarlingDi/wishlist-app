@@ -6,7 +6,7 @@ import type { DB } from "../db/client.js";
 import { wishImages } from "../db/schema.js";
 import { HttpError } from "../errors.js";
 import { parseWishlistRef, shareLink } from "../links.js";
-import { dataUrlToBuffer, processImage, storeImage } from "../services/images.js";
+import { dataUrlToBuffer, processImage, sanitizeBox, storeImage } from "../services/images.js";
 import { fetchLinkPreview, siteNameFromUrl } from "../services/scrape.js";
 import { safeGet } from "../services/ssrf.js";
 import type { Notifier } from "../services/notify.js";
@@ -187,7 +187,11 @@ export function apiRouter({ cfg, db, notifier, vision }: ApiDeps): Router {
     }),
   );
 
-  /** Screenshot → title, price and the product photo cut out of it (Claude vision). */
+  /**
+   * Screenshot → title, price and a guess at where the product photo is (Claude/OpenAI vision).
+   * No image is stored here: the client crops the picture itself (the person can drag/zoom the
+   * frame, starting from this suggested box) and uploads the result through POST /images.
+   */
   r.post(
     "/parse/screenshot",
     rateLimit(20, 3600_000),
@@ -195,8 +199,8 @@ export function apiRouter({ cfg, db, notifier, vision }: ApiDeps): Router {
       if (!vision) throw new HttpError(503, "vision_not_configured");
       const { image } = z.object({ image: z.string() }).parse(req.body);
       const source = dataUrlToBuffer(image);
-      // The model gets a large copy (text on a tall phone screenshot must stay legible);
-      // the box it returns is relative, so it applies to the original as well.
+      // Only used to build the model's input; the box it returns is relative (0..1), so it
+      // applies just as well to the original the client already has in memory.
       const forModel = await processImage(source, null, 1568);
       let found;
       try {
@@ -205,18 +209,7 @@ export function apiRouter({ cfg, db, notifier, vision }: ApiDeps): Router {
         console.error("vision failed", e);
         throw new HttpError(502, "vision_failed");
       }
-      const crop = found.box ? await processImage(source, found.box) : null;
-      const whole = await processImage(source);
-      const cropped = !!crop?.cropped;
-      res.json({
-        title: found.title,
-        price: found.price,
-        currency: found.currency,
-        ...(await imageResult(cropped ? crop! : whole)),
-        cropped,
-        // Lets the UI offer "use the whole screenshot" when the automatic crop is off.
-        screenshot: cropped ? await imageResult(whole) : null,
-      });
+      res.json({ title: found.title, price: found.price, currency: found.currency, box: sanitizeBox(found.box) });
     }),
   );
 

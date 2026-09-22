@@ -1,5 +1,6 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sanitizeBox } from "../src/services/images.js";
 import { buildInitData, makeApp, pngDataUrl, tma } from "./helpers.js";
 
 const owner = { id: 1001, first_name: "Оля" };
@@ -170,22 +171,28 @@ describe("validation", () => {
 });
 
 describe("screenshot parsing and images", () => {
-  it("returns title, price and a cropped product photo that is served with a frame colour", async () => {
+  it("returns title, price and a suggested crop box, but stores no image (the client crops and uploads it itself)", async () => {
     const res = await request(t.app).post("/api/parse/screenshot").set(as(owner)).send({ image: await pngDataUrl(800, 600, "#00aa00") });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ title: "Кроссовки Nike", price: 8990, currency: "RUB", cropped: true });
-    expect(res.body.image_bg).toMatch(/^#[0-9a-f]{6}$/);
-    expect(res.body.screenshot).toMatchObject({ image_id: expect.any(String), image_url: expect.stringContaining("/api/images/") });
+    // Padded a little by the server (see sanitizeBox) so a tight AI guess doesn't crop into the product.
+    expect(res.body).toEqual({ title: "Кроссовки Nike", price: 8990, currency: "RUB", box: sanitizeBox({ x: 0.25, y: 0.25, width: 0.5, height: 0.5 }) });
+  });
 
-    const img = await request(t.app).get(res.body.image_url); // public: no Authorization header on <img>
+  it("uploads a client-cropped photo, served with a frame colour and visible to everyone who can see the wish", async () => {
+    const up = await request(t.app).post("/api/images").set(as(owner)).send({ image: await pngDataUrl(400, 400, "#00aa00") });
+    expect(up.status).toBe(201);
+    expect(up.body.image_bg).toMatch(/^#[0-9a-f]{6}$/);
+    expect(up.body.image_url).toContain("/api/images/");
+
+    const img = await request(t.app).get(up.body.image_url); // public: no Authorization header on <img>
     expect(img.status).toBe(200);
     expect(img.headers["content-type"]).toBe("image/jpeg");
     expect(img.headers["cache-control"]).toContain("immutable");
 
     // The saved wish exposes the image and the frame colour to viewers.
-    const { id } = await addWish({ title: "С картинкой", image_id: res.body.image_id });
+    const { id } = await addWish({ title: "С картинкой", image_id: up.body.image_id });
     const list = await request(t.app).get(`/api/wishes?owner=${owner.id}`).set(as(anya));
-    expect(list.body.items.find((w: { id: number }) => w.id === id)).toMatchObject({ image_url: res.body.image_url, image_bg: res.body.image_bg });
+    expect(list.body.items.find((w: { id: number }) => w.id === id)).toMatchObject({ image_url: up.body.image_url, image_bg: up.body.image_bg });
   });
 
   it("rejects non-images and unauthenticated uploads", async () => {

@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
-import { api, errorText, type Photo, type Wish } from "./api";
+import { Fragment, useRef, useState } from "react";
+import { api, errorText, type Box, type Photo, type Wish } from "./api";
 import { Frame } from "./components";
+import { CropSheet } from "./CropSheet";
 import { CameraIcon } from "./Icons";
 import { fileToJpegDataUrl, isHttpUrl } from "./image";
 import { showAlert } from "./telegram";
@@ -11,9 +12,10 @@ type Picture = { id: string | null; url: string | null; bg: string | null };
 const asPicture = (p: Photo): Picture => ({ id: p.image_id, url: p.image_url, bg: p.image_bg });
 
 /**
- * Add / edit a wish. Flow: screenshot of the product page → title, price and product photo are
- * recognised → the person is asked for the link → save. Everything stays editable by hand,
- * because recognition can be wrong or unavailable.
+ * Add / edit a wish. Flow: screenshot of the product page → title and price are recognised and
+ * the person positions the product photo in a square crop tool (starting from where the model
+ * thinks it is) → the link is asked for → save. Everything stays editable by hand, because
+ * recognition can be wrong, incomplete, or (without an API key) unavailable.
  */
 export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: () => void; onSaved: (w: Wish, isNew: boolean) => void }) {
   const [title, setTitle] = useState(wish?.title ?? "");
@@ -23,8 +25,12 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
   const [group, setGroup] = useState(wish?.is_group_gift ?? false);
   const [picture, setPicture] = useState<Picture>({ id: null, url: wish?.image_url ?? null, bg: wish?.image_bg ?? null });
   const [pictureChanged, setPictureChanged] = useState(false);
-  const [wholeShot, setWholeShot] = useState<Picture | null>(null);
-  const [cropPicture, setCropPicture] = useState<Picture | null>(null);
+  // The locally-picked screenshot/photo, kept in memory so the crop tool can be reopened without
+  // re-uploading anything. There's deliberately no such source for an existing wish's saved photo
+  // (it lives on the server, on a different origin) — pick a new photo to get the crop tool back.
+  const [rawSource, setRawSource] = useState<string | null>(null);
+  const [seedBox, setSeedBox] = useState<Box | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const [busy, setBusy] = useState<Busy>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,19 +52,26 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
     setBusy("shot");
     setError(null);
     setHint(null);
+    let dataUrl: string;
     try {
-      const r = await api.parseScreenshot(await fileToJpegDataUrl(file));
+      dataUrl = await fileToJpegDataUrl(file);
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(null);
+      return;
+    }
+    setRawSource(dataUrl);
+    setRecognised(true);
+    let box: Box | null = null;
+    try {
+      const r = await api.parseScreenshot(dataUrl);
       if (r.title) setTitle(r.title);
       if (r.price) setPrice(String(r.price));
       setCurrency(r.currency);
-      const main = asPicture(r);
-      usePicture(main);
-      setCropPicture(r.cropped ? main : null);
-      setWholeShot(r.screenshot ? asPicture(r.screenshot) : null);
-      setRecognised(true);
+      box = r.box;
       setHint(
         r.title || r.price
-          ? "Проверьте название и цену, затем вставьте ссылку на товар."
+          ? "Проверьте название и цену, подстройте фото и вставьте ссылку."
           : "Не удалось найти название и цену — впишите их вручную и вставьте ссылку.",
       );
     } catch (e) {
@@ -66,6 +79,8 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
     } finally {
       setBusy(null);
     }
+    setSeedBox(box);
+    setCropOpen(true);
   }
 
   async function onOtherPhoto(file: File | undefined) {
@@ -73,10 +88,24 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
     setBusy("photo");
     setError(null);
     try {
-      const r = await api.uploadImage(await fileToJpegDataUrl(file, 1600, 0.85));
-      usePicture(asPicture(r));
-      setWholeShot(null);
-      setCropPicture(null);
+      const dataUrl = await fileToJpegDataUrl(file);
+      setRawSource(dataUrl);
+      setSeedBox(null);
+      setCropOpen(true);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onCropConfirm(dataUrl: string, box: Box) {
+    setCropOpen(false);
+    setSeedBox(box);
+    setBusy("photo");
+    setError(null);
+    try {
+      usePicture(asPicture(await api.uploadImage(dataUrl)));
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -125,6 +154,7 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
   }
 
   return (
+    <Fragment>
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
         <p className="modal-title">{wish ? "Изменить подарок" : "Добавить подарок"}</p>
@@ -145,6 +175,11 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
         <div className="preview-card">
           <div className="preview-photo">
             <Frame src={picture.url} bg={picture.bg} />
+            {rawSource && (
+              <button type="button" className="link-btn" onClick={() => setCropOpen(true)}>
+                Подстроить рамку
+              </button>
+            )}
             <button type="button" className="link-btn" disabled={busy === "photo"} onClick={() => photoInput.current?.click()}>
               {busy === "photo" ? "…" : picture.url ? "Другое фото" : "Добавить фото"}
             </button>
@@ -155,17 +190,6 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
             <input className="input" placeholder="Цена, ₽ (необязательно)" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/\D/g, ""))} />
           </div>
         </div>
-
-        {wholeShot && cropPicture && (
-          <div className="segmented" role="group" aria-label="Что показывать в рамке">
-            <button className={picture.id === cropPicture.id ? "on" : ""} onClick={() => usePicture(cropPicture)}>
-              Только товар
-            </button>
-            <button className={picture.id === wholeShot.id ? "on" : ""} onClick={() => usePicture(wholeShot)}>
-              Весь скриншот
-            </button>
-          </div>
-        )}
 
         <div>
           <input
@@ -203,5 +227,7 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
         </button>
       </div>
     </div>
+      {cropOpen && rawSource && <CropSheet src={rawSource} box={seedBox} onCancel={() => setCropOpen(false)} onConfirm={onCropConfirm} />}
+    </Fragment>
   );
 }

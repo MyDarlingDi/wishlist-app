@@ -47,9 +47,19 @@ export interface ParsedItem extends Photo {
   price: number | null;
   currency: string;
 }
-export interface ScreenshotResult extends ParsedItem {
-  cropped: boolean;
-  screenshot: (Photo & { image_id: string }) | null;
+/** Relative rectangle (0..1) over the screenshot, e.g. {x:0,y:0,width:1,height:1} = the whole image. */
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface ScreenshotResult {
+  title: string | null;
+  price: number | null;
+  currency: string;
+  /** Where the model thinks the product photo is — a starting point for the crop tool, nothing is stored yet. */
+  box: Box | null;
 }
 export interface WishInput {
   title?: string;
