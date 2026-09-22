@@ -9,7 +9,8 @@ const schema = z.object({
   /** Mini App URL (Vercel). Also the only allowed CORS origin. */
   WEBAPP_URL: z.string().url(),
   /** Mini App short name registered in BotFather (/newapp). Optional. */
-  APP_SHORT_NAME: z.string().optional(),
+  /** Mini App short name registered in BotFather (already "wishlist" — see README). Needed for the reliable startapp deep link. */
+  APP_SHORT_NAME: z.string().default("wishlist"),
   /** postgres://… ; unset or `pglite:<dir>` = embedded dev database. */
   DATABASE_URL: z.string().optional(),
   /** Optional override. Default: derived from BOT_TOKEN (see webhookSecret()). */

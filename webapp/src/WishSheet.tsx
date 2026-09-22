@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { api, errorText, type Photo, type Wish } from "./api";
 import { Frame } from "./components";
+import { CameraIcon } from "./Icons";
 import { fileToJpegDataUrl, isHttpUrl } from "./image";
 import { showAlert } from "./telegram";
 
@@ -131,7 +132,9 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
         {!wish && !recognised && (
           <>
             <button className="dropzone" onClick={() => shotInput.current?.click()} disabled={busy === "shot"}>
-              <span className="dropzone-icon">{busy === "shot" ? "⏳" : "📸"}</span>
+              <span className={`dropzone-icon ${busy === "shot" ? "spin" : ""}`}>
+                <CameraIcon />
+              </span>
               <span className="dropzone-title">{busy === "shot" ? "Распознаём скриншот…" : "Загрузить скриншот товара"}</span>
               <span className="hint-text">Название, цену и фото найдём сами</span>
             </button>

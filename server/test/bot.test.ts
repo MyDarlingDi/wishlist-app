@@ -72,7 +72,7 @@ describe("/start", () => {
 describe("/share", () => {
   it("returns the link to the caller's own wishlist", async () => {
     await say("/share", olya, { id: olya.id, type: "private" });
-    expect(sent().text).toContain("https://t.me/wish_and_gift_bot?start=wishlist_1001");
+    expect(sent().text).toContain("https://t.me/wish_and_gift_bot/wishlist?startapp=wishlist_1001");
   });
 });
 

@@ -11,7 +11,7 @@ export function parseWishlistRef(ref: string | undefined | null): number | null 
  * With a Mini App short name registered in BotFather it opens the app directly,
  * otherwise it opens the bot chat and /start shows an "open" button.
  */
-export function shareLink(cfg: Pick<Config, "BOT_USERNAME" | "APP_SHORT_NAME">, ownerId: number): string {
+export function shareLink(cfg: { BOT_USERNAME: string; APP_SHORT_NAME?: string }, ownerId: number): string {
   return cfg.APP_SHORT_NAME
     ? `https://t.me/${cfg.BOT_USERNAME}/${cfg.APP_SHORT_NAME}?startapp=wishlist_${ownerId}`
     : `https://t.me/${cfg.BOT_USERNAME}?start=wishlist_${ownerId}`;

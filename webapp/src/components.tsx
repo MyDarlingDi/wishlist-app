@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { assetUrl, type Person, type Wish } from "./api";
 import { formatPrice } from "./image";
+import { CheckIcon, PencilIcon, PeopleIcon, TrashIcon } from "./Icons";
 
 /**
  * Product photo in a fixed square frame. The frame is painted with the picture's own edge colour
@@ -52,8 +53,16 @@ export function WishCard({ wish, isOwner, onOpen, onBook, onContribute, onEdit, 
       <button className="gift-image-wrap" onClick={() => onOpen(wish)} aria-label={`Открыть товар: ${wish.title}`} disabled={!wish.url}>
         <Frame src={wish.image_url} bg={wish.image_bg} />
       </button>
-      {!isOwner && (wish.booked || funded) && <span className="ribbon-seal" title={wish.booked_by_me ? "Забронировано вами" : "Уже занято"}>✓</span>}
-      {isOwner && wish.is_group_gift && <span className="chip-group">вскладчину</span>}
+      {!isOwner && (wish.booked || funded) && (
+        <span className="ribbon-seal" title={wish.booked_by_me ? "Забронировано вами" : "Уже занято"}>
+          <CheckIcon size={13} />
+        </span>
+      )}
+      {isOwner && wish.is_group_gift && (
+        <span className="chip-group">
+          <PeopleIcon /> вскладчину
+        </span>
+      )}
 
       <div className="gift-body">
         <div className="gift-title" onClick={() => onOpen(wish)} role="button">
@@ -90,10 +99,10 @@ export function WishCard({ wish, isOwner, onOpen, onBook, onContribute, onEdit, 
         {isOwner && (
           <div className="owner-item-actions">
             <button className="icon-btn" onClick={() => onEdit(wish)} aria-label="Изменить">
-              ✎
+              <PencilIcon />
             </button>
-            <button className="icon-btn" onClick={() => onDelete(wish)} aria-label="Удалить">
-              ✕
+            <button className="icon-btn danger" onClick={() => onDelete(wish)} aria-label="Удалить">
+              <TrashIcon />
             </button>
           </div>
         )}

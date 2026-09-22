@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errorText, type Me, type Wish, type WishesResponse } from "./api";
 import { ContributeSheet } from "./ContributeSheet";
 import { ProfileCard, WishCard } from "./components";
+import { PlusIcon } from "./Icons";
 import { WishSheet } from "./WishSheet";
 import { confirmDialog, haptic, inTelegram, openLink, openTelegramLink, requestedOwner, showAlert } from "./telegram";
 
@@ -72,7 +73,11 @@ export default function App() {
   if (!data || !me)
     return (
       <div className="screen">
-        <div className="loading-wrap">Загружаем вишлист…</div>
+        <div className="skeleton-profile" />
+        <div className="grid">
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+        </div>
       </div>
     );
 
@@ -126,7 +131,7 @@ export default function App() {
 
       {isOwner && (
         <button className="fab" onClick={() => setEditing("new")} aria-label="Добавить подарок">
-          +
+          <PlusIcon />
         </button>
       )}
       {editing && <WishSheet wish={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} onSaved={onSaved} />}

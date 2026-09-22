@@ -43,7 +43,7 @@ describe("auth", () => {
   it("creates the user and default wishlist on first sight and reports the share link", async () => {
     const res = await request(t.app).get("/api/me").set(as(owner));
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ id: 1001, first_name: "Оля", share_link: "https://t.me/wish_and_gift_bot?start=wishlist_1001" });
+    expect(res.body).toMatchObject({ id: 1001, first_name: "Оля", share_link: "https://t.me/wish_and_gift_bot/wishlist?startapp=wishlist_1001" });
     expect(res.body.wishlist_id).toBeGreaterThan(0);
   });
 });
