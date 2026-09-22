@@ -5,12 +5,12 @@
  * (booking, saving, the add button) rather than smeared across every surface.
  */
 :root {
-  /* Telegram supplies these at runtime (telegram.ts); these are the out-of-Telegram fallbacks. */
+  /* Telegram supplies these at runtime (telegram.ts); these are the out-of-Telegram fallbacks.
+     Only neutral surface tones follow the viewer's Telegram theme — the accent below is entirely
+     the app's own and never mixes with whatever colour someone picked for their Telegram client. */
   --tg-bg: #ffffff;
   --tg-text: #1d1d1f;
   --tg-hint: #86868b;
-  --tg-button: #0a7cff;
-  --tg-button-text: #ffffff;
   --tg-secondary-bg: #f5f5f7;
 
   --accent: #ff375f;
@@ -38,7 +38,6 @@
     --tg-text: #f5f5f7;
     --tg-hint: #98989d;
     --tg-secondary-bg: #1c1c1e;
-    --tg-button: #409cff;
     --line: rgba(255, 255, 255, 0.12);
     --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.45);
   }
@@ -48,7 +47,6 @@
   --tg-text: #f5f5f7;
   --tg-hint: #98989d;
   --tg-secondary-bg: #1c1c1e;
-  --tg-button: #409cff;
   --line: rgba(255, 255, 255, 0.12);
   --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.45);
 }
@@ -77,7 +75,7 @@ button:disabled { cursor: default; }
 }
 .profile-avatar {
   width: 60px; height: 60px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
-  background: linear-gradient(150deg, var(--accent), #ff8a5c);
+  background: var(--accent);
   display: flex; align-items: center; justify-content: center; color: #fff; font-size: 24px; font-weight: 700;
 }
 .profile-info { min-width: 0; }
@@ -94,7 +92,8 @@ button:disabled { cursor: default; }
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
 .btn:active { transform: scale(.96); }
-.btn-primary { background: var(--tg-button); color: var(--tg-button-text); }
+/* Neutral ink pill (Apple's own "secondary but solid" pattern) — pairs with any accent choice without ever clashing. */
+.btn-primary { background: var(--tg-text); color: var(--tg-bg); }
 .btn-ribbon { background: var(--accent); color: #fff; }
 .btn-ghost { background: var(--tg-secondary-bg); color: var(--tg-text); }
 .btn-outline { background: transparent; color: var(--tg-text); border: 1px solid var(--line); }
@@ -104,7 +103,7 @@ button:disabled { cursor: default; }
 .action-row.wrap { flex-wrap: wrap; }
 .share-bar { display: flex; gap: 10px; }
 .link-btn {
-  border: none; background: none; color: var(--tg-button); font-size: 13.5px; font-weight: 600; padding: 6px 0;
+  border: none; background: none; color: var(--accent); font-size: 13.5px; font-weight: 600; padding: 6px 0;
   cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
 }
 .link-btn:disabled { opacity: .55; }

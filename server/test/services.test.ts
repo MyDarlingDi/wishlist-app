@@ -153,3 +153,19 @@ describe("webhookSecret", () => {
     expect(webhookSecret({ BOT_TOKEN: "x", WEBHOOK_SECRET: "explicit-override-1234" })).toBe("explicit-override-1234");
   });
 });
+
+describe("APP_SHORT_NAME", () => {
+  const base = { BOT_TOKEN: "1:aaaaaaaaaaaaaaaaaaaa", WEBAPP_URL: "https://x.vercel.app" };
+
+  // A dashboard field present-but-blank must fall back too — that's exactly what silently
+  // dropped everyone back onto the unreliable ?start= link the first time this shipped.
+  it.each([[{}], [{ APP_SHORT_NAME: "" }], [{ APP_SHORT_NAME: "  " }], [{ APP_SHORT_NAME: "\n" }]])("falls back to the registered short name for %j", async (extra) => {
+    const { loadConfig } = await import("../src/config.js");
+    expect(loadConfig({ ...base, ...extra }).APP_SHORT_NAME).toBe("wishlist");
+  });
+
+  it("still honours an explicit override", async () => {
+    const { loadConfig } = await import("../src/config.js");
+    expect(loadConfig({ ...base, APP_SHORT_NAME: " other " }).APP_SHORT_NAME).toBe("other");
+  });
+});

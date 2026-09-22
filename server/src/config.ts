@@ -8,9 +8,16 @@ const schema = z.object({
   BOT_USERNAME: z.string().default("wish_and_gift_bot"),
   /** Mini App URL (Vercel). Also the only allowed CORS origin. */
   WEBAPP_URL: z.string().url(),
-  /** Mini App short name registered in BotFather (/newapp). Optional. */
-  /** Mini App short name registered in BotFather (already "wishlist" — see README). Needed for the reliable startapp deep link. */
-  APP_SHORT_NAME: z.string().default("wishlist"),
+  /**
+   * Mini App short name registered in BotFather (already "wishlist" — see README), used for the
+   * reliable startapp deep link. `.trim() || fallback` (not `.default()`) on purpose: an env var
+   * present but left blank on Render must fall back too, not silently produce an empty string —
+   * that's what broke the share link the first time.
+   */
+  APP_SHORT_NAME: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || "wishlist"),
   /** postgres://… ; unset or `pglite:<dir>` = embedded dev database. */
   DATABASE_URL: z.string().optional(),
   /** Optional override. Default: derived from BOT_TOKEN (see webhookSecret()). */

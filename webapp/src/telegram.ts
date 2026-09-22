@@ -25,12 +25,14 @@ export function initTelegram() {
 function applyTheme() {
   if (!tg) return;
   const p = tg.themeParams;
+  // Only neutral surface tones follow the viewer's Telegram theme. `button_color` is deliberately
+  // NOT mapped: it's whatever accent the person picked for their own Telegram client, which has
+  // nothing to do with this app's brand colour — pulling it in made buttons an unpredictable
+  // clash against our own accent for anyone with a customised theme.
   const map: Record<string, string | undefined> = {
     "--tg-bg": p.bg_color,
     "--tg-text": p.text_color,
     "--tg-hint": p.hint_color,
-    "--tg-button": p.button_color,
-    "--tg-button-text": p.button_text_color,
     "--tg-secondary-bg": p.secondary_bg_color,
   };
   for (const [k, v] of Object.entries(map)) if (v) document.documentElement.style.setProperty(k, v);
