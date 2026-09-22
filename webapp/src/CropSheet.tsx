@@ -87,14 +87,28 @@ export function CropSheet({ src, box, onCancel, onConfirm }: { src: string; box:
 
   function onPointerDown(e: React.PointerEvent) {
     if (!view) return;
-    (e.target as Element).setPointerCapture(e.pointerId);
+    // No setPointerCapture: some Telegram WebViews (older iOS in particular) throw on it, which
+    // — uncaught, inside a React event handler — used to take the whole app down. It isn't
+    // needed for the common case anyway (the finger stays within the crop square while dragging).
     drag.current = { x: e.clientX, y: e.clientY, ox: view.x, oy: view.y };
   }
   function onPointerMove(e: React.PointerEvent) {
-    if (!drag.current || !view) return;
-    const dx = e.clientX - drag.current.x;
-    const dy = e.clientY - drag.current.y;
-    setView((v) => v && { ...v, ...clampOffset(v, drag.current!.ox + dx, drag.current!.oy + dy, viewport) });
+    // Snapshot the ref into a local now, and compute the target position as plain numbers —
+    // never re-read `drag.current` from inside the setView updater below. A fast real swipe
+    // fires several pointermove events right before pointerup; React can flush their queued
+    // updates after `endDrag()` has already nulled the ref, so an updater that re-reads
+    // `drag.current` (even with a "no way this is null" `!`) throws mid-flush and — uncaught —
+    // took the whole app down. This is that bug, caught and fixed.
+    const d = drag.current;
+    if (!d || !view) return;
+    try {
+      const nx = d.ox + (e.clientX - d.x);
+      const ny = d.oy + (e.clientY - d.y);
+      setView((v) => v && { ...v, ...clampOffset(v, nx, ny, viewport) });
+    } catch (err) {
+      // A missed frame of panning beats taking the whole app down over something we didn't anticipate.
+      console.error("crop drag failed", err);
+    }
   }
   const endDrag = () => (drag.current = null);
 
