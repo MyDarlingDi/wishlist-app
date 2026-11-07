@@ -157,6 +157,29 @@ describe("group gifts", () => {
   });
 });
 
+describe("wishes without a link", () => {
+  type Item = { id: number; url: string | null; site_name: string | null };
+
+  // A blank link field must not be an error: the link is optional (people add things they saw in a shop).
+  it.each([[{}], [{ url: null }], [{ url: "" }]])("creates a wish from %j and shows it to guests", async (extra) => {
+    const res = await request(t.app).post("/api/wishes").set(as(owner)).send({ title: "Без ссылки", price: 500, ...extra });
+    expect(res.status).toBe(201);
+    expect(res.body.item).toMatchObject({ title: "Без ссылки", url: null, site_name: null });
+
+    const guestView = await request(t.app).get(`/api/wishes?owner=${owner.id}`).set(as(anya));
+    expect(guestView.body.items.find((w: Item) => w.id === res.body.item.id)).toMatchObject({ url: null });
+  });
+
+  it("lets the owner add a link later and take it away again", async () => {
+    const { id } = await addWish({ title: "Позже со ссылкой", url: null });
+    const added = await request(t.app).patch(`/api/wishes/${id}`).set(as(owner)).send({ url: "https://www.ozon.ru/product/1" });
+    expect(added.body.item).toMatchObject({ url: "https://www.ozon.ru/product/1", site_name: "Ozon" });
+    const removed = await request(t.app).patch(`/api/wishes/${id}`).set(as(owner)).send({ url: "" });
+    expect(removed.status).toBe(200);
+    expect(removed.body.item).toMatchObject({ url: null, site_name: null });
+  });
+});
+
 describe("validation", () => {
   it.each([
     [{ title: "" }],

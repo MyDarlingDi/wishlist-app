@@ -65,9 +65,13 @@ export function WishCard({ wish, isOwner, onOpen, onBook, onContribute, onEdit, 
       )}
 
       <div className="gift-body">
-        <div className="gift-title" onClick={() => onOpen(wish)} role="button">
-          {wish.title}
-        </div>
+        {wish.url ? (
+          <div className="gift-title" onClick={() => onOpen(wish)} role="button">
+            {wish.title}
+          </div>
+        ) : (
+          <div className="gift-title static">{wish.title}</div>
+        )}
         {wish.site_name && <div className="gift-site">{wish.site_name}</div>}
         {price && <div className="gift-price">{price}</div>}
 

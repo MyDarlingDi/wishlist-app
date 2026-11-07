@@ -4,6 +4,7 @@ import { Frame } from "./components";
 import { CropSheet } from "./CropSheet";
 import { CameraIcon } from "./Icons";
 import { fileToJpegDataUrl, isHttpUrl } from "./image";
+import { parseShareText } from "./shareText";
 import { showAlert } from "./telegram";
 
 type Busy = null | "shot" | "link" | "photo" | "save";
@@ -14,8 +15,9 @@ const asPicture = (p: Photo): Picture => ({ id: p.image_id, url: p.image_url, bg
 /**
  * Add / edit a wish. Flow: screenshot of the product page → title and price are recognised and
  * the person positions the product photo in a square crop tool (starting from where the model
- * thinks it is) → the link is asked for → save. Everything stays editable by hand, because
- * recognition can be wrong, incomplete, or (without an API key) unavailable.
+ * thinks it is) → save. The link is optional; if one is pasted together with the shop's «Поделиться»
+ * text, the link is kept and the name/price are lifted out of the text. Everything stays editable
+ * by hand, because recognition can be wrong, incomplete, or (without an API key) unavailable.
  */
 export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: () => void; onSaved: (w: Wish, isNew: boolean) => void }) {
   const [title, setTitle] = useState(wish?.title ?? "");
@@ -38,9 +40,10 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
   const shotInput = useRef<HTMLInputElement>(null);
   const photoInput = useRef<HTMLInputElement>(null);
 
-  const urlOk = isHttpUrl(url);
+  const urlFilled = url.trim() !== "";
+  const urlInvalid = urlFilled && !isHttpUrl(url);
   const priceNum = price ? Number(price) : null;
-  const canSave = !!title.trim() && urlOk && !busy && (!group || !!priceNum);
+  const canSave = !!title.trim() && !urlInvalid && !busy && (!group || !!priceNum);
 
   function usePicture(p: Picture) {
     setPicture(p);
@@ -71,8 +74,8 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
       box = r.box;
       setHint(
         r.title || r.price
-          ? "Проверьте название и цену, подстройте фото и вставьте ссылку."
-          : "Не удалось найти название и цену — впишите их вручную и вставьте ссылку.",
+          ? "Проверьте название и цену и подстройте фото. Ссылку можно добавить, но это необязательно."
+          : "Не удалось найти название и цену — впишите их вручную. Ссылка необязательна.",
       );
     } catch (e) {
       setError(errorText(e));
@@ -113,13 +116,33 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
     }
   }
 
+  /**
+   * The pasted text may be a whole shop «Поделиться» message. The field keeps just the link (nothing to
+   * clean up by hand), and an empty name/price are filled from the text around it — the shops won't
+   * serve their pages to our server, but the name and price are right there in what was copied.
+   */
+  function onUrlInput(raw: string) {
+    const parsed = parseShareText(raw);
+    if (!parsed?.hadText) {
+      setUrl(raw);
+      return;
+    }
+    setUrl(parsed.url);
+    const newTitle = !title.trim() ? parsed.title : null;
+    const newPrice = !price ? parsed.price : null;
+    if (newTitle) setTitle(newTitle);
+    if (newPrice) setPrice(String(newPrice));
+    if (newTitle || newPrice) setHint("Название и цену взяли из текста со ссылкой — проверьте их.");
+    else if (!title.trim()) void fillFromLink(parsed.url); // nothing usable in the text: try the shop's page itself
+  }
+
   /** Fills only what is still empty, so it never overwrites what the screenshot already found. */
-  async function fillFromLink() {
-    if (!urlOk) return;
+  async function fillFromLink(target: string) {
+    if (!isHttpUrl(target)) return;
     setBusy("link");
     setError(null);
     try {
-      const r = await api.parseLink(url.trim());
+      const r = await api.parseLink(target.trim());
       if (!title.trim() && r.title) setTitle(r.title);
       if (!price && r.price) setPrice(String(r.price));
       if (!picture.url && r.image_url) usePicture(asPicture(r));
@@ -138,7 +161,7 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
     try {
       const body = {
         title: title.trim(),
-        url: url.trim(),
+        url: url.trim() || null,
         price: priceNum,
         currency,
         is_group_gift: group,
@@ -193,22 +216,24 @@ export function WishSheet({ wish, onClose, onSaved }: { wish?: Wish; onClose: ()
 
         <div>
           <input
-            className={`input ${recognised && !url ? "input-attn" : ""}`}
-            placeholder="Ссылка на товар (https://…)"
+            className="input"
+            placeholder="Ссылка на товар (необязательно)"
             inputMode="url"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => onUrlInput(e.target.value)}
             onPaste={(e) => {
               const pasted = e.clipboardData.getData("text").trim();
-              if (isHttpUrl(pasted) && !title.trim()) setTimeout(fillFromLink, 0);
+              if (isHttpUrl(pasted) && !title.trim()) setTimeout(() => void fillFromLink(pasted), 0);
             }}
             autoFocus={!!wish}
           />
           <p className="hint-text mt">
-            {url && !urlOk ? "Ссылка должна начинаться с https://" : "Друзья откроют её, чтобы купить именно этот товар."}
+            {urlInvalid
+              ? "Ссылка должна начинаться с https://"
+              : "Необязательно. Можно вставить сообщение из Ozon или Wildberries целиком — ссылку и название найдём сами."}
           </p>
-          {urlOk && (
-            <button type="button" className="link-btn" disabled={busy === "link"} onClick={fillFromLink}>
+          {urlFilled && !urlInvalid && (
+            <button type="button" className="link-btn" disabled={busy === "link"} onClick={() => void fillFromLink(url)}>
               {busy === "link" ? "Читаем страницу…" : "✨ Подтянуть данные по ссылке"}
             </button>
           )}

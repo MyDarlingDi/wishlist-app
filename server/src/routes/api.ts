@@ -35,9 +35,12 @@ const httpUrl = z
 const price = z.number().int().min(1).max(100_000_000);
 const currency = z.enum(["RUB", "USD", "EUR", "KZT", "BYN", "UAH"]);
 
+/** The link is optional, and a blank field (""/spaces) means "no link" rather than a validation error. */
+const optionalUrl = z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), httpUrl.nullish());
+
 const WishBody = z.object({
   title: z.string().trim().min(1).max(200),
-  url: httpUrl.nullish(),
+  url: optionalUrl,
   price: price.nullish(),
   currency: currency.optional(),
   image_id: z.string().uuid().nullish(),
