@@ -59,9 +59,31 @@ export function authHeader(): string {
 
 export const inTelegram = () => !!tg?.initData;
 
+/**
+ * Telegram hands the `startapp` value over in more than one place depending on the client and its
+ * version: signed initData (the normal one), or `tgWebAppStartParam` in the page address / the copy
+ * its own script keeps in sessionStorage. Reading all of them means a friend's link can't silently
+ * land on their own empty list just because their client picked a different route.
+ */
+function startParam(): string | null {
+  const signed = tg?.initDataUnsafe.start_param;
+  if (signed) return signed;
+  for (const source of [location.hash.replace(/^#/, ""), location.search.replace(/^\?/, "")]) {
+    const fromUrl = new URLSearchParams(source).get("tgWebAppStartParam");
+    if (fromUrl) return fromUrl;
+  }
+  try {
+    const stored = JSON.parse(sessionStorage.getItem("__telegram__initParams") ?? "{}") as { tgWebAppStartParam?: unknown };
+    if (typeof stored.tgWebAppStartParam === "string" && stored.tgWebAppStartParam) return stored.tgWebAppStartParam;
+  } catch {
+    // sessionStorage can be blocked or hold something unexpected; the other routes already had their chance.
+  }
+  return null;
+}
+
 /** Wishlist to open: `startapp=wishlist_<id>` (direct link) or `?wl=<id>` (button in the bot chat). Also accepts old `u<id>`. */
 export function requestedOwner(): number | null {
-  const raw = tg?.initDataUnsafe.start_param ?? new URLSearchParams(location.search).get("wl");
+  const raw = startParam() ?? new URLSearchParams(location.search).get("wl");
   const m = /^(?:wishlist_|u)?(\d{1,15})$/.exec(raw ?? "");
   return m ? Number(m[1]) : null;
 }

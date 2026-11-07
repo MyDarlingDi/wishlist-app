@@ -97,7 +97,7 @@ export default function App() {
 
       {isOwner && (
         <div className="share-bar">
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(me.share_link)}&text=${encodeURIComponent("Мой вишлист 🎁")}`)}>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(me.share_link)}&text=${encodeURIComponent(`Вишлист: ${me.first_name} 🎁`)}`)}>
             Отправить другу
           </button>
           <button className="btn btn-outline" onClick={copy}>
